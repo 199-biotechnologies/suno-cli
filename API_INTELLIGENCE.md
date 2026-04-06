@@ -118,6 +118,60 @@ Cover generation (not tested, likely needs POST).
 ### POST /api/remaster/
 Remaster with different model (not tested).
 
+## Voices / Persona Creation Flow (captured April 6, 2026)
+
+Full pipeline for creating a Voice persona from audio:
+
+### Step 1: Upload initial voice sample
+The S3 presigned upload happens first (not captured here), then:
+```
+POST /api/uploads/audio/{upload_id}/upload-finish/
+```
+Response: `200 OK` (empty body, content-length: 2)
+
+### Step 2: Poll upload status
+```
+GET /api/uploads/audio/{upload_id}/
+```
+Response: JSON with processing status.
+
+### Step 3: Extract vocal stem
+```
+POST /api/processed_clip/voice-vox-stem
+Content-Length: ~90 bytes
+```
+Extracts clean vocals from uploaded audio. Body likely: `{"upload_id": "<id>"}`.
+Called multiple times — once per upload (sample + verification).
+
+### Step 4: Record & upload verification phrase
+User reads: "Listening to the melody of a gentle summer breeze"
+Second upload goes through the same upload-finish flow with a new upload_id.
+
+### Step 5: Voice verification
+```
+POST /api/voice-verification/
+Content-Length: 179 bytes
+```
+Verifies the voice matches. Body likely includes both upload IDs + verification text.
+
+### Step 6: Create persona
+```
+POST /api/persona/create/
+Content-Length: 47261 bytes (large — likely includes audio data as base64)
+```
+Creates the voice persona from the verified audio clips.
+
+### Endpoints summary:
+- `POST /api/uploads/audio/{id}/upload-finish/` — mark upload complete
+- `GET /api/uploads/audio/{id}/` — poll upload processing
+- `POST /api/processed_clip/voice-vox-stem` — extract vocals
+- `POST /api/voice-verification/` — verify voice sample
+- `POST /api/persona/create/` — create voice persona (47KB payload)
+
+### To implement in CLI:
+Need to capture the REQUEST BODIES (not just headers) to see exact JSON payloads.
+The S3 presigned upload step (before upload-finish) also needs capturing.
+
 ## Key Insights for Rust CLI
 
 1. **Captcha is the main challenge** — generation requires a captcha token that gcui-art solves via Playwright browser automation
