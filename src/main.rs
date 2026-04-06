@@ -8,8 +8,8 @@ mod output;
 
 use clap::Parser;
 
-use api::types::GenerateRequest;
 use api::SunoClient;
+use api::types::GenerateRequest;
 use auth::AuthState;
 use cli::*;
 use errors::CliError;

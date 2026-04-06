@@ -1,7 +1,11 @@
 use clap::{Parser, Subcommand, ValueEnum};
 
 #[derive(Parser)]
-#[command(name = "suno", version, about = "Suno AI music generation CLI — v5.5 support")]
+#[command(
+    name = "suno",
+    version,
+    about = "Suno AI music generation CLI — v5.5 support"
+)]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Commands,
@@ -298,10 +302,7 @@ pub enum ConfigAction {
     /// Show current configuration
     Show,
     /// Set a configuration value
-    Set {
-        key: String,
-        value: String,
-    },
+    Set { key: String, value: String },
     /// Validate configuration
     Check,
 }

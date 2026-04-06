@@ -1,7 +1,7 @@
 use std::path::Path;
 
-use indicatif::{ProgressBar, ProgressStyle};
 use futures_util::StreamExt;
+use indicatif::{ProgressBar, ProgressStyle};
 
 use crate::api::types::Clip;
 use crate::errors::CliError;
@@ -21,7 +21,13 @@ pub async fn download_clip(clip: &Clip, output_dir: &str, video: bool) -> Result
     let safe_title: String = clip
         .title
         .chars()
-        .map(|c| if c.is_alphanumeric() || c == ' ' || c == '-' { c } else { '_' })
+        .map(|c| {
+            if c.is_alphanumeric() || c == ' ' || c == '-' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect();
     let filename = format!("{safe_title}.{ext}");
     let path = Path::new(output_dir).join(&filename);

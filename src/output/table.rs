@@ -1,4 +1,4 @@
-use comfy_table::{modifiers::UTF8_ROUND_CORNERS, presets::UTF8_FULL, Table, ContentArrangement};
+use comfy_table::{ContentArrangement, Table, modifiers::UTF8_ROUND_CORNERS, presets::UTF8_FULL};
 
 use crate::api::types::{BillingInfo, Clip, LyricsResult, Model};
 
@@ -72,7 +72,11 @@ pub fn models(models: &[Model]) {
         table.add_row(vec![
             &m.name,
             &m.external_key,
-            &if m.is_default_model { "yes".into() } else { String::new() },
+            &if m.is_default_model {
+                "yes".into()
+            } else {
+                String::new()
+            },
             &m.max_lengths.prompt.to_string(),
             &m.max_lengths.tags.to_string(),
             &m.description,

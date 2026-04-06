@@ -13,7 +13,10 @@ pub fn success<T: Serialize>(data: T) {
         status: "success",
         data,
     };
-    println!("{}", serde_json::to_string_pretty(&envelope).unwrap_or_default());
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&envelope).unwrap_or_default()
+    );
 }
 
 pub fn error(code: &str, message: &str) {
@@ -25,5 +28,8 @@ pub fn error(code: &str, message: &str) {
             "message": message,
         }
     });
-    eprintln!("{}", serde_json::to_string_pretty(&envelope).unwrap_or_default());
+    eprintln!(
+        "{}",
+        serde_json::to_string_pretty(&envelope).unwrap_or_default()
+    );
 }

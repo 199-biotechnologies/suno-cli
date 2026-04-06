@@ -1,4 +1,7 @@
-use figment::{Figment, providers::{Env, Serialized}};
+use figment::{
+    Figment,
+    providers::{Env, Serialized},
+};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]

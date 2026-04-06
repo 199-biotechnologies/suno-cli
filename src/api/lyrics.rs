@@ -33,7 +33,9 @@ impl SunoClient {
                 return Ok(result);
             }
             if start.elapsed() > timeout {
-                return Err(CliError::GenerationFailed("lyrics generation timed out".into()));
+                return Err(CliError::GenerationFailed(
+                    "lyrics generation timed out".into(),
+                ));
             }
         }
     }
