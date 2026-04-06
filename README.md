@@ -16,11 +16,13 @@
 &nbsp;
 [![Rust](https://img.shields.io/badge/Rust-2024-orange?style=for-the-badge&logo=rust)](https://www.rust-lang.org/)
 &nbsp;
+[![crates.io](https://img.shields.io/crates/v/suno-cli?style=for-the-badge)](https://crates.io/crates/suno-cli)
+&nbsp;
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen?style=for-the-badge)](https://github.com/199-biotechnologies/suno-cli/pulls)
 
 ---
 
-A 3.4MB Rust binary that talks directly to Suno's API. Generate songs with custom lyrics, style tags, vocal control, weirdness/style sliders, and every v5.5 feature — no browser needed.
+A 3.7MB Rust binary that talks directly to Suno's API. Generate songs with custom lyrics, style tags, your own voice, vocal control, weirdness/style sliders, and every v5.5 feature. Zero-friction auth — one command extracts credentials from your browser automatically.
 
 [Install](#install) | [Quick Start](#quick-start) | [Commands](#commands) | [Features](#features) | [Contributing](#contributing)
 
@@ -30,7 +32,7 @@ A 3.4MB Rust binary that talks directly to Suno's API. Generate songs with custo
 
 Suno has no official API. The web UI works, but you can't script it, pipe lyrics from a file, batch-generate, or integrate it into a music production workflow.
 
-This CLI fixes that. Cookie-based auth, every generation parameter exposed as a flag, dual JSON/table output for both humans and AI agents.
+This CLI fixes that. Auto-auth from your browser, every generation parameter exposed as a flag, dual JSON/table output for both humans and AI agents. Downloads auto-embed synced lyrics into MP3 files.
 
 ## Install
 
@@ -54,16 +56,13 @@ Download from [GitHub Releases](https://github.com/199-biotechnologies/suno-cli/
 ## Quick Start
 
 ```bash
-# 1. Get your JWT from browser DevTools (Network tab → any Suno request → Authorization header)
-suno auth --jwt "eyJhbG..." --device "your-device-id"
+# 1. Authenticate (auto-extracts from Chrome/Arc/Brave/Firefox/Edge)
+suno auth --login
 
 # 2. Check your credits
 suno credits
 
-# 3. Generate lyrics (free, no credits)
-suno lyrics --prompt "a song about weekend coding sessions"
-
-# 4. Generate a song
+# 3. Generate a song
 suno generate \
   --title "Weekend Code" \
   --tags "indie rock, guitar, upbeat" \
@@ -73,12 +72,22 @@ suno generate \
   --weirdness 40 \
   --style-influence 65 \
   --wait --download ./songs/
+
+# 4. Generate with your voice persona
+suno generate \
+  --title "My Song" \
+  --tags "pop, warm" \
+  --voice e483d2f0-50ca-4a09-8a74-b9e074646377 \
+  --lyrics "[Verse]\nHello from the CLI"
+
+# 5. Let Suno write the lyrics for you
+suno describe --prompt "a chill lo-fi track about rainy mornings" --wait
 ```
 
 ## Commands
 
 ```
-suno generate        Custom mode — lyrics + tags + title + sliders
+suno generate        Custom mode — lyrics + tags + title + sliders + voice
 suno describe        Description mode — Suno writes lyrics from your prompt
 suno lyrics          Generate lyrics only (free, no credits)
 suno extend          Continue a clip from a timestamp
@@ -88,17 +97,33 @@ suno remaster        Remaster with a different model
 suno stems           Extract vocals and instruments
 suno list            List your songs
 suno search <query>  Search songs by title or tags
-suno status <id>     Check generation progress
-suno download <ids>  Download audio/video (multiple IDs supported)
+suno status <ids>    Check generation progress
+suno download <ids>  Download audio/video with embedded lyrics
 suno delete <ids>    Delete/trash clips
+suno set <id>        Update title, lyrics, caption, or remove cover
+suno publish <ids>   Toggle public/private visibility
+suno timed-lyrics    Get word-level timestamped lyrics (--lrc for LRC format)
 suno credits         Show balance and plan info
 suno models          List available models with limits
 suno auth            Set up authentication
-suno config         show | set | check
-suno agent-info     Machine-readable capabilities JSON
+suno config          show | set | check
+suno agent-info      Machine-readable capabilities JSON
 ```
 
 ## Features
+
+### Zero-Friction Auth
+
+```bash
+suno auth --login    # Extracts session from your browser automatically
+```
+
+Reads the Clerk auth cookie from Chrome, Arc, Brave, Firefox, or Edge. Exchanges it for a JWT via Clerk token exchange. Auto-refreshes when expired (~7 day session lifetime). One macOS Keychain dialog on first run, then silent.
+
+Three auth methods (in order of convenience):
+1. `suno auth --login` — automatic browser extraction (recommended)
+2. `suno auth --cookie <clerk_cookie>` — manual paste for headless servers
+3. `suno auth --jwt <token>` — direct JWT, expires in ~1 hour
 
 ### Generation Parameters
 
@@ -108,15 +133,53 @@ suno agent-info     Machine-readable capabilities JSON
 | `--tags` | Style direction | `"pop, synths, upbeat"` (1000 chars) |
 | `--exclude` | Styles to avoid | `"metal, heavy, dark"` (1000 chars) |
 | `--lyrics` / `--lyrics-file` | Custom lyrics with `[Verse]` tags | up to 5000 chars |
-| `--prompt` (inspire) | Free text description | up to 500 chars |
+| `--prompt` (describe) | Free text description | up to 500 chars |
 | `--model` | Model version | v5.5, v5, v4.5+, v4.5, v4, v3.5, v3, v2 |
 | `--vocal` | Vocal gender | male, female |
+| `--voice` | Voice persona ID | UUID from `suno list` persona clips |
 | `--weirdness` | How experimental | 0-100 |
 | `--style-influence` | How strictly to follow tags | 0-100 |
 | `--variation` | Output variation | high, normal, subtle |
 | `--instrumental` | No vocals | flag |
 | `--wait` | Block until done | flag |
 | `--download <dir>` | Auto-download after generation | directory path |
+
+### Voice Personas
+
+Generate songs using your own voice. Create a voice in Suno's web UI, then use the persona ID:
+
+```bash
+# Find your persona ID from clips that used your voice
+suno list --json | jq '.data[] | select(.metadata.persona_id) | .metadata.persona_id'
+
+# Generate with your voice
+suno generate --voice <persona_id> --title "My Song" --tags "pop" --lyrics "[Verse]\nHello world"
+```
+
+### Edit & Manage
+
+```bash
+# Update title and lyrics on an existing clip
+suno set <clip_id> --title "New Title" --lyrics-file updated.txt
+
+# Make clips public
+suno publish <clip_id_1> <clip_id_2>
+
+# Get timed lyrics in LRC format
+suno timed-lyrics <clip_id> --lrc > song.lrc
+```
+
+### Downloads with Embedded Lyrics
+
+Downloads automatically embed lyrics into MP3 files via ID3 tags:
+- **USLT** (plain lyrics) — shown in most music players
+- **SYLT** (synced word-by-word timestamps) — shown in Apple Music with timing
+
+```bash
+suno download <id1> <id2> --output ./songs/
+```
+
+Files use slug format: `title-slug-clipid8.mp3` — no overwrites when Suno generates 2 variations.
 
 ### Models
 
@@ -130,7 +193,7 @@ suno agent-info     Machine-readable capabilities JSON
 
 ### Agent-Friendly
 
-Every command supports `--json` for structured output. When stdout is piped, JSON is auto-detected. Progress, errors, and spinners go to stderr. Exit codes are semantic:
+Every command supports `--json` for structured output. When stdout is piped, JSON is auto-detected. Progress and errors go to stderr. Exit codes are semantic:
 
 | Code | Meaning |
 |---|---|
@@ -142,46 +205,25 @@ Every command supports `--json` for structured output. When stdout is piped, JSO
 
 ```bash
 # Pipe-friendly: auto-JSON when piped
-suno feed | jq '.[0].title'
+suno list | jq '.data[0].title'
 
 # Explicit JSON
 suno credits --json
+
+# Agent capabilities
+suno agent-info
 ```
 
-### How Auth Works
+### API Endpoint Versions (Confirmed)
 
-```
-Browser DevTools → copy JWT + device-id → suno auth → stored at ~/.config/suno-cli/auth.json
-```
+| Endpoint | Version | Status |
+|---|---|---|
+| Feed | **v3** (`POST /api/feed/v3`) | Latest |
+| Generate | **v2** (`POST /api/generate/v2/`) | Latest (only version that exists) |
+| Concat | **v2** (`POST /api/generate/concat/v2/`) | Latest |
+| Aligned lyrics | **v2** (`GET /api/gen/{id}/aligned_lyrics/v2/`) | Latest |
 
-The JWT expires after ~1 hour. Re-run `suno auth` with a fresh token when it expires. The CLI checks expiry before every request and tells you when it's time to refresh.
-
-## Project Structure
-
-```
-src/
-├── main.rs           Entry point, command routing
-├── cli.rs            All clap derive structs
-├── auth.rs           JWT storage, browser-token generation
-├── config.rs         Config layering (env vars, defaults)
-├── errors.rs         Error types with exit codes
-├── download.rs       Audio/video download with progress bar
-├── api/
-│   ├── mod.rs        SunoClient — auth headers, base requests
-│   ├── types.rs      Clip, Model, BillingInfo, etc.
-│   ├── generate.rs   Music generation + polling
-│   ├── lyrics.rs     Lyrics generation
-│   ├── billing.rs    Credits and plan info
-│   ├── feed.rs       Song listing
-│   ├── concat.rs     Clip concatenation
-│   ├── cover.rs      Cover generation
-│   ├── remaster.rs   Remastering
-│   └── stems.rs      Stem extraction
-└── output/
-    ├── mod.rs        Format detection (TTY vs piped)
-    ├── json.rs       JSON envelope
-    └── table.rs      Terminal tables
-```
+All generation tasks (normal, voice, cover, extend) go through `/api/generate/v2/` with different `task` values.
 
 ## Contributing
 
@@ -191,8 +233,8 @@ src/
 4. Open a PR
 
 We especially welcome:
-- New API endpoint coverage (personas, voices, custom models)
-- Better auth flows (Clerk cookie refresh, OS keychain)
+- Audio upload implementation (S3 presigned flow is documented in `API_INTELLIGENCE.md`)
+- Cover/remaster endpoint confirmation
 - Integration tests
 
 ## License
