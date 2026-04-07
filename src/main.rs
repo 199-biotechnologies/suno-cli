@@ -588,6 +588,68 @@ async fn run() -> Result<(), CliError> {
             }
         },
 
+        Commands::InstallSkill(args) => {
+            const SKILL_BODY: &str = include_str!("../assets/SKILL.md");
+
+            if args.print {
+                print!("{SKILL_BODY}");
+                return Ok(());
+            }
+
+            let home = directories::UserDirs::new()
+                .map(|d| d.home_dir().to_path_buf())
+                .ok_or_else(|| CliError::Config("could not determine home directory".into()))?;
+
+            let dest_path: std::path::PathBuf = if let Some(custom) = args.path {
+                if let Some(stripped) = custom.strip_prefix("~/") {
+                    home.join(stripped)
+                } else if custom == "~" {
+                    home.clone()
+                } else {
+                    std::path::PathBuf::from(custom)
+                }
+            } else {
+                match args.target {
+                    SkillTarget::Claude => home.join(".claude/skills/suno/SKILL.md"),
+                    SkillTarget::Cursor => std::env::current_dir()?.join(".cursor/rules/suno.mdc"),
+                }
+            };
+
+            if dest_path.exists() && !args.force {
+                return Err(CliError::Config(format!(
+                    "{} already exists — pass --force to overwrite",
+                    dest_path.display()
+                )));
+            }
+
+            if let Some(parent) = dest_path.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            std::fs::write(&dest_path, SKILL_BODY)?;
+
+            match fmt {
+                OutputFormat::Json => output::json::success(serde_json::json!({
+                    "installed": true,
+                    "path": dest_path.display().to_string(),
+                    "target": match args.target {
+                        SkillTarget::Claude => "claude",
+                        SkillTarget::Cursor => "cursor",
+                    },
+                })),
+                OutputFormat::Table => {
+                    eprintln!("Installed suno skill to: {}", dest_path.display());
+                    match args.target {
+                        SkillTarget::Claude => eprintln!(
+                            "Restart Claude Code to pick up the new skill (or it loads on next session)."
+                        ),
+                        SkillTarget::Cursor => {
+                            eprintln!("Cursor will pick up the rule on next workspace reload.")
+                        }
+                    }
+                }
+            }
+        }
+
         Commands::AgentInfo => {
             let auth_path = directories::ProjectDirs::from("com", "suno-cli", "suno-cli")
                 .map(|d| d.config_dir().join("auth.json").display().to_string())
@@ -602,7 +664,8 @@ async fn run() -> Result<(), CliError> {
                     "cover", "remaster", "stems", "info", "persona",
                     "list", "search", "status", "download", "delete",
                     "set", "publish", "timed-lyrics",
-                    "credits", "models", "auth", "config", "agent-info"
+                    "credits", "models", "auth", "config", "agent-info",
+                    "install-skill"
                 ],
                 "models": {
                     "v5.5": "chirp-fenix",

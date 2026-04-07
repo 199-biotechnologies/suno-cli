@@ -1,6 +1,6 @@
 <div align="center">
 
-# suno-cli
+# suno
 
 **Generate AI music from your terminal — full Suno v5.5 support**
 
@@ -16,7 +16,7 @@
 &nbsp;
 [![Rust](https://img.shields.io/badge/Rust-2024-orange?style=for-the-badge&logo=rust)](https://www.rust-lang.org/)
 &nbsp;
-[![crates.io](https://img.shields.io/crates/v/suno-cli?style=for-the-badge)](https://crates.io/crates/suno-cli)
+[![crates.io](https://img.shields.io/crates/v/suno?style=for-the-badge)](https://crates.io/crates/suno)
 &nbsp;
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen?style=for-the-badge)](https://github.com/199-biotechnologies/suno-cli/pulls)
 
@@ -40,13 +40,13 @@ This CLI fixes that. Auto-auth from your browser, every generation parameter exp
 
 ```bash
 brew tap 199-biotechnologies/tap
-brew install suno-cli
+brew install suno
 ```
 
 ### Cargo (any platform)
 
 ```bash
-cargo install suno-cli
+cargo install suno
 ```
 
 ### Pre-built binaries
@@ -127,6 +127,7 @@ suno timed-lyrics    Get word-level timestamped lyrics (--lrc for LRC format)
 suno auth            Set up authentication
 suno config          show | set | check
 suno agent-info      Machine-readable capabilities JSON
+suno install-skill   Install agent skill into Claude Code / Cursor
 ```
 
 ## Features
@@ -273,6 +274,26 @@ suno list | jq '.data[0].title'
 # Agent capabilities discovery
 suno agent-info
 ```
+
+### Install as a Coding Agent Skill
+
+Teach Claude Code (or Cursor) how to use `suno` with one command:
+
+```bash
+# Claude Code (~/.claude/skills/suno/SKILL.md)
+suno install-skill
+
+# Cursor (./.cursor/rules/suno.mdc in the current workspace)
+suno install-skill --target cursor
+
+# Print the skill content without writing
+suno install-skill --print
+
+# Custom path
+suno install-skill --path ~/my-agents/suno.md --force
+```
+
+After installation, your coding agent automatically picks up the skill on the next session and knows how to invoke `suno` for music generation, downloads, stems, covers, and remasters.
 
 ### API Endpoint Versions (Confirmed)
 

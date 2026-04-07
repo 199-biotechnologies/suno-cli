@@ -1,6 +1,6 @@
 [package]
-name = "suno-cli"
-version = "0.5.0"
+name = "suno"
+version = "0.5.1"
 edition = "2024"
 description = "Generate AI music from your terminal — Suno v5.5 with tags, exclude, vocal control, and all generation features"
 license = "MIT"

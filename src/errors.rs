@@ -81,7 +81,7 @@ impl CliError {
             Self::GenerationFailed(_) => "Check `suno credits` for remaining balance",
             Self::Api { .. } | Self::Http(_) => "Check your network connection and retry",
             Self::Io(_) => "Check file permissions and disk space",
-            Self::Json(_) => "This may indicate an API change — update suno-cli",
+            Self::Json(_) => "This may indicate an API change — update suno",
         }
     }
 }

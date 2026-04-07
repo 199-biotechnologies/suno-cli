@@ -89,6 +89,9 @@ pub enum Commands {
 
     /// Machine-readable capabilities (for AI agents)
     AgentInfo,
+
+    /// Install the agent skill (teaches Claude Code / coding agents how to use this CLI)
+    InstallSkill(InstallSkillArgs),
 }
 
 #[derive(clap::Args)]
@@ -410,6 +413,33 @@ pub struct AuthArgs {
 pub struct ConfigArgs {
     #[command(subcommand)]
     pub action: ConfigAction,
+}
+
+#[derive(clap::Args)]
+pub struct InstallSkillArgs {
+    /// Target coding agent
+    #[arg(long, default_value = "claude")]
+    pub target: SkillTarget,
+
+    /// Custom output path (overrides --target default)
+    #[arg(long)]
+    pub path: Option<String>,
+
+    /// Overwrite existing skill file
+    #[arg(short, long)]
+    pub force: bool,
+
+    /// Print the skill content to stdout instead of writing
+    #[arg(long)]
+    pub print: bool,
+}
+
+#[derive(ValueEnum, Clone, Debug)]
+pub enum SkillTarget {
+    /// Claude Code (~/.claude/skills/suno/SKILL.md)
+    Claude,
+    /// Cursor (.cursor/rules/suno.mdc in current dir)
+    Cursor,
 }
 
 #[derive(Subcommand)]
