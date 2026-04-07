@@ -1,5 +1,6 @@
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD as BASE64URL;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -35,12 +36,30 @@ impl AuthState {
             std::fs::create_dir_all(parent)?;
         }
         let data = serde_json::to_string_pretty(self)?;
-        std::fs::write(&path, &data)?;
+
+        // Atomic write: create temp file with restricted permissions, then rename
+        let tmp = path.with_extension("json.tmp");
+
         #[cfg(unix)]
         {
-            use std::os::unix::fs::PermissionsExt;
-            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))?;
+            use std::io::Write;
+            use std::os::unix::fs::OpenOptionsExt;
+            let mut file = std::fs::OpenOptions::new()
+                .create(true)
+                .truncate(true)
+                .write(true)
+                .mode(0o600)
+                .open(&tmp)?;
+            file.write_all(data.as_bytes())?;
+            file.sync_all()?;
         }
+
+        #[cfg(not(unix))]
+        {
+            std::fs::write(&tmp, &data)?;
+        }
+
+        std::fs::rename(&tmp, &path)?;
         Ok(())
     }
 
@@ -61,12 +80,8 @@ impl AuthState {
             return true;
         }
         let claims = parts[1];
-        let padded = match claims.len() % 4 {
-            2 => format!("{claims}=="),
-            3 => format!("{claims}="),
-            _ => claims.to_string(),
-        };
-        let Ok(decoded) = BASE64.decode(&padded) else {
+        // JWT claims use Base64URL encoding, not standard Base64
+        let Ok(decoded) = BASE64URL.decode(claims) else {
             return true;
         };
         let Ok(value) = serde_json::from_slice::<serde_json::Value>(&decoded) else {
@@ -104,37 +119,22 @@ pub fn browser_token() -> String {
 /// Extract the __client cookie for auth.suno.com from the user's browsers.
 /// Tries Chrome, Firefox, Safari, Arc, Brave, Edge in order.
 pub fn extract_clerk_cookie() -> Result<String, CliError> {
-    let domains = Some(vec!["auth.suno.com".to_string(), ".suno.com".to_string()]);
+    let domains = vec!["auth.suno.com".into(), ".suno.com".into()];
 
-    // Each closure calls a different browser extractor
-    type BrowserFn = dyn Fn() -> eyre::Result<Vec<rookie::enums::Cookie>>;
-    let browsers: &[(&str, &BrowserFn)] = &[
-        ("Chrome", &|| {
-            rookie::chrome(Some(vec!["auth.suno.com".into(), ".suno.com".into()]))
-        }),
-        ("Arc", &|| {
-            rookie::arc(Some(vec!["auth.suno.com".into(), ".suno.com".into()]))
-        }),
-        ("Brave", &|| {
-            rookie::brave(Some(vec!["auth.suno.com".into(), ".suno.com".into()]))
-        }),
-        ("Firefox", &|| {
-            rookie::firefox(Some(vec!["auth.suno.com".into(), ".suno.com".into()]))
-        }),
-        ("Edge", &|| {
-            rookie::edge(Some(vec!["auth.suno.com".into(), ".suno.com".into()]))
-        }),
-    ];
-    let _ = domains; // suppress unused warning
-
-    for (name, extract_fn) in browsers {
-        if let Ok(cookies) = extract_fn() {
-            for cookie in &cookies {
-                if cookie.name == "__client" && !cookie.value.is_empty() {
-                    eprintln!("Found Suno session in {name}");
-                    return Ok(cookie.value.clone());
-                }
-            }
+    for (name, result) in [
+        ("Chrome", rookie::chrome(Some(domains.clone()))),
+        ("Arc", rookie::arc(Some(domains.clone()))),
+        ("Brave", rookie::brave(Some(domains.clone()))),
+        ("Firefox", rookie::firefox(Some(domains.clone()))),
+        ("Edge", rookie::edge(Some(domains.clone()))),
+    ] {
+        if let Ok(cookies) = result
+            && let Some(cookie) = cookies
+                .into_iter()
+                .find(|c| c.name == "__client" && !c.value.is_empty())
+        {
+            eprintln!("Found Suno session in {name}");
+            return Ok(cookie.value);
         }
     }
 
@@ -159,7 +159,12 @@ pub async fn clerk_token_exchange(
         .map_err(CliError::Http)?;
 
     if !resp.status().is_success() {
-        return Err(CliError::AuthExpired);
+        let status = resp.status();
+        let body = resp.text().await.unwrap_or_default();
+        return Err(CliError::Api {
+            code: "clerk_exchange_failed",
+            message: format!("Clerk token exchange failed ({status}): {body}"),
+        });
     }
 
     let body: serde_json::Value = resp.json().await.map_err(CliError::Http)?;
@@ -196,7 +201,12 @@ pub async fn clerk_refresh_jwt(
         .map_err(CliError::Http)?;
 
     if !resp.status().is_success() {
-        return Err(CliError::AuthExpired);
+        let status = resp.status();
+        let body = resp.text().await.unwrap_or_default();
+        return Err(CliError::Api {
+            code: "clerk_refresh_failed",
+            message: format!("Clerk JWT refresh failed ({status}): {body}"),
+        });
     }
 
     let body: serde_json::Value = resp.json().await.map_err(CliError::Http)?;

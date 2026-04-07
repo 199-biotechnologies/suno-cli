@@ -118,7 +118,11 @@ async fn run() -> Result<(), CliError> {
 
     match cli.command {
         Commands::Auth(args) => {
-            let mut state = AuthState::load().unwrap_or_default();
+            let mut state = match AuthState::load() {
+                Ok(s) => s,
+                Err(CliError::AuthMissing) => AuthState::default(),
+                Err(e) => return Err(e),
+            };
 
             if args.login {
                 // Automatic: extract cookies from browser
@@ -564,7 +568,10 @@ async fn run() -> Result<(), CliError> {
                 println!("{}", serde_json::to_string_pretty(&cfg)?);
             }
             ConfigAction::Set { key, value } => {
-                eprintln!("config set {key}={value} — not yet implemented (use env vars SUNO_*)");
+                return Err(CliError::Config(format!(
+                    "`config set {key}={value}` is not yet implemented — use env vars (SUNO_{key})",
+                    key = key.to_uppercase()
+                )));
             }
             ConfigAction::Check => {
                 let _ = config::AppConfig::load();
@@ -646,7 +653,8 @@ async fn main() {
         if json_mode {
             output::json::error(e.error_code(), &e.to_string(), e.suggestion());
         } else {
-            eprintln!("Error: {e}");
+            eprintln!("Error [{}]: {}", e.error_code(), e);
+            eprintln!("Hint: {}", e.suggestion());
         }
         std::process::exit(e.exit_code());
     }

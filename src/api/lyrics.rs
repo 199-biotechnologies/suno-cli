@@ -15,12 +15,12 @@ impl SunoClient {
         let resp = self.check_response(resp).await?;
         let submit: LyricsSubmitResponse = resp.json().await?;
 
-        // Poll until complete (lyrics are fast, ~5-10 seconds)
         let timeout = std::time::Duration::from_secs(60);
         let start = std::time::Instant::now();
+        let mut delay = std::time::Duration::from_secs(2);
 
         loop {
-            tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+            tokio::time::sleep(delay).await;
 
             let resp = self
                 .get(&format!("/api/generate/lyrics/{}", submit.id))
@@ -29,7 +29,10 @@ impl SunoClient {
             let resp = self.check_response(resp).await?;
             let result: LyricsResult = resp.json().await?;
 
-            if result.status == "complete" || !result.error_message.is_empty() {
+            if !result.error_message.is_empty() {
+                return Err(CliError::GenerationFailed(result.error_message));
+            }
+            if result.status == "complete" {
                 return Ok(result);
             }
             if start.elapsed() > timeout {
@@ -37,6 +40,7 @@ impl SunoClient {
                     "lyrics generation timed out".into(),
                 ));
             }
+            delay = (delay * 2).min(std::time::Duration::from_secs(8));
         }
     }
 }

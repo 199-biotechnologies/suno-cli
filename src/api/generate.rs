@@ -20,17 +20,25 @@ impl SunoClient {
     ) -> Result<Vec<Clip>, CliError> {
         let start = std::time::Instant::now();
         let timeout = std::time::Duration::from_secs(timeout_secs);
+        let mut delay = std::time::Duration::from_secs(3);
 
         loop {
             let clips = self.get_clips(ids).await?;
             let all_done = clips
                 .iter()
-                .all(|c| c.status == "complete" || c.status == "error");
+                .all(|c| matches!(c.status.as_str(), "complete" | "error"));
 
-            if all_done || start.elapsed() > timeout {
+            if all_done {
                 return Ok(clips);
             }
-            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+            if start.elapsed() >= timeout {
+                return Err(CliError::GenerationFailed(format!(
+                    "generation timed out after {timeout_secs}s for {}",
+                    ids.join(", ")
+                )));
+            }
+            tokio::time::sleep(delay).await;
+            delay = (delay * 2).min(std::time::Duration::from_secs(15));
         }
     }
 

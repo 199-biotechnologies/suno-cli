@@ -44,7 +44,8 @@ impl SunoClient {
                         auth.save()?;
                         eprintln!("JWT refreshed successfully");
                     }
-                    Err(_) => {
+                    Err(e) => {
+                        eprintln!("JWT refresh failed: {e}");
                         return Err(CliError::AuthExpired);
                     }
                 }
@@ -95,8 +96,15 @@ impl SunoClient {
         resp: reqwest::Response,
     ) -> Result<reqwest::Response, CliError> {
         let status = resp.status();
-        if status == 401 || status == 403 {
+        if status == 401 {
             return Err(CliError::AuthExpired);
+        }
+        if status == 403 {
+            let body = resp.text().await.unwrap_or_default();
+            return Err(CliError::Api {
+                code: "forbidden",
+                message: format!("HTTP 403 Forbidden: {body}"),
+            });
         }
         if status == 429 {
             return Err(CliError::RateLimited);

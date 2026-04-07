@@ -34,7 +34,13 @@ pub async fn download_clip(clip: &Clip, output_dir: &str, video: bool) -> Result
     let path = Path::new(output_dir).join(&filename);
 
     let client = reqwest::Client::new();
-    let resp = client.get(url).send().await.map_err(CliError::Http)?;
+    let resp = client
+        .get(url)
+        .send()
+        .await
+        .map_err(CliError::Http)?
+        .error_for_status()
+        .map_err(CliError::Http)?;
 
     let total = resp.content_length().unwrap_or(0);
     let pb = ProgressBar::new(total);
