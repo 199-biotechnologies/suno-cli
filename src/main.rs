@@ -9,7 +9,7 @@ mod output;
 use clap::Parser;
 
 use api::SunoClient;
-use api::types::{ControlSliders, GenerateMetadata, GenerateRequest, SetMetadataRequest};
+use api::types::{ControlSliders, GenerateRequest, SetMetadataRequest};
 use auth::AuthState;
 use cli::*;
 use errors::CliError;
@@ -37,20 +37,19 @@ fn build_tags(tags: Option<&str>, vocal: Option<&VocalGender>) -> Option<String>
     }
 }
 
-/// Build metadata with control sliders (weirdness, style influence).
-fn build_metadata(
+/// Build a control_sliders block when --weirdness or --style-influence is set.
+/// Returns None when neither is provided so we don't pollute the request.
+fn build_control_sliders(
     weirdness: Option<f64>,
     style_influence: Option<f64>,
-) -> Option<GenerateMetadata> {
+) -> Option<ControlSliders> {
     if weirdness.is_none() && style_influence.is_none() {
         return None;
     }
-    Some(GenerateMetadata {
-        control_sliders: Some(ControlSliders {
-            // Normalize 0-100 → 0.0-1.0
-            weirdness_constraint: weirdness.map(|w| (w / 100.0).clamp(0.0, 1.0)),
-            style_weight: style_influence.map(|s| (s / 100.0).clamp(0.0, 1.0)),
-        }),
+    Some(ControlSliders {
+        // Normalize 0-100 → 0.0-1.0
+        weirdness_constraint: weirdness.map(|w| (w / 100.0).clamp(0.0, 1.0)),
+        style_weight: style_influence.map(|s| (s / 100.0).clamp(0.0, 1.0)),
     })
 }
 
@@ -227,45 +226,23 @@ async fn run() -> Result<(), CliError> {
                 _ => None,
             };
             let tags = build_tags(args.tags.as_deref(), args.vocal.as_ref());
-            let metadata = build_metadata(args.weirdness, args.style_influence);
+            let control_sliders =
+                build_control_sliders(args.weirdness, args.style_influence);
 
             let c = client().await?;
 
-            // Check captcha before generating
-            if let Ok(captcha_needed) = c.check_captcha().await
-                && captcha_needed
-                && args.token.is_none()
-            {
-                eprintln!(
-                    "Warning: captcha required. Use --token <hcaptcha_token> or solve captcha in browser."
-                );
-                eprintln!("Tip: Premier accounts with 200+ credits consumed usually skip captcha.");
-            }
-
-            // If persona specified, use task="vox"
-            let (task, persona_id) = if let Some(ref pid) = args.persona {
-                (Some("vox".to_string()), Some(pid.clone()))
-            } else {
-                (None, None)
-            };
-
-            let req = GenerateRequest {
-                mv: args.model.to_api_key().to_string(),
-                prompt: lyrics,
-                gpt_description_prompt: None,
-                title: args.title,
-                tags,
-                negative_tags: args.exclude,
-                make_instrumental: args.instrumental,
-                generation_type: Some("TEXT".into()),
-                token: args.token,
-                continue_clip_id: None,
-                continue_at: None,
-                task,
-                persona_id,
-                cover_clip_id: None,
-                metadata,
-            };
+            // Build the new v2-web request shape. Persona generation routes
+            // through the same endpoint with persona_id set; the legacy
+            // task="vox" field no longer exists in the v2-web schema.
+            let mut req = GenerateRequest::new(args.model.to_api_key(), "custom");
+            req.prompt = lyrics.unwrap_or_default();
+            req.title = args.title;
+            req.tags = tags;
+            req.negative_tags = args.exclude.unwrap_or_default();
+            req.make_instrumental = args.instrumental;
+            req.token = args.token;
+            req.persona_id = args.persona.clone();
+            req.metadata.control_sliders = control_sliders;
 
             if !cli.quiet {
                 let persona_note = if args.persona.is_some() {
@@ -292,31 +269,19 @@ async fn run() -> Result<(), CliError> {
 
         Commands::Describe(args) => {
             let tags = build_tags(args.tags.as_deref(), args.vocal.as_ref());
-            let metadata = build_metadata(args.weirdness, args.style_influence);
+            let control_sliders =
+                build_control_sliders(args.weirdness, args.style_influence);
 
-            let (task, persona_id) = if let Some(ref pid) = args.persona {
-                (Some("vox".to_string()), Some(pid.clone()))
-            } else {
-                (None, None)
-            };
-
-            let req = GenerateRequest {
-                mv: args.model.to_api_key().to_string(),
-                prompt: Some(String::new()),
-                gpt_description_prompt: Some(args.prompt),
-                title: None,
-                tags,
-                negative_tags: None,
-                make_instrumental: args.instrumental,
-                generation_type: Some("TEXT".into()),
-                token: None,
-                continue_clip_id: None,
-                continue_at: None,
-                task,
-                persona_id,
-                cover_clip_id: None,
-                metadata,
-            };
+            // The v2-web schema dropped `gpt_description_prompt` — inspiration
+            // mode is now signalled by `create_mode: "inspiration"` and the
+            // text is sent in the same `prompt` field as custom mode.
+            let mut req =
+                GenerateRequest::new(args.model.to_api_key(), "inspiration");
+            req.prompt = args.prompt;
+            req.tags = tags;
+            req.make_instrumental = args.instrumental;
+            req.persona_id = args.persona.clone();
+            req.metadata.control_sliders = control_sliders;
 
             if !cli.quiet {
                 eprintln!("Submitting description ({})...", args.model.display_name());
@@ -335,23 +300,11 @@ async fn run() -> Result<(), CliError> {
         }
 
         Commands::Extend(args) => {
-            let req = GenerateRequest {
-                mv: "chirp-fenix".into(),
-                prompt: args.lyrics,
-                gpt_description_prompt: None,
-                title: None,
-                tags: args.tags,
-                negative_tags: None,
-                make_instrumental: false,
-                generation_type: Some("TEXT".into()),
-                token: None,
-                continue_clip_id: Some(args.clip_id),
-                continue_at: Some(args.at),
-                task: None,
-                persona_id: None,
-                cover_clip_id: None,
-                metadata: None,
-            };
+            let mut req = GenerateRequest::new("chirp-fenix", "custom");
+            req.prompt = args.lyrics.unwrap_or_default();
+            req.tags = args.tags;
+            req.continue_clip_id = Some(args.clip_id);
+            req.continue_at = Some(args.at);
 
             let c = client().await?;
             let clips = c.generate(&req).await?;
@@ -650,6 +603,72 @@ async fn run() -> Result<(), CliError> {
             }
         }
 
+        Commands::Update(args) => {
+            let current = env!("CARGO_PKG_VERSION");
+            let updater = self_update::backends::github::Update::configure()
+                .repo_owner("199-biotechnologies")
+                .repo_name("suno-cli")
+                .bin_name("suno")
+                .show_download_progress(!cli.quiet)
+                .current_version(current)
+                .build()
+                .map_err(|e| CliError::Update(e.to_string()))?;
+
+            if args.check {
+                let latest = updater
+                    .get_latest_release()
+                    .map_err(|e| CliError::Update(e.to_string()))?;
+                let v = latest.version.trim_start_matches('v').to_string();
+                let up_to_date = v == current;
+                let status = if up_to_date {
+                    "up_to_date"
+                } else {
+                    "update_available"
+                };
+                let result = serde_json::json!({
+                    "current_version": current,
+                    "latest_version": v,
+                    "status": status,
+                });
+                match fmt {
+                    OutputFormat::Json => output::json::success(&result),
+                    OutputFormat::Table => {
+                        if up_to_date {
+                            eprintln!("Up to date (v{current})");
+                        } else {
+                            eprintln!("Update available: v{current} -> v{v}");
+                            eprintln!("Run `suno update` to install");
+                        }
+                    }
+                }
+            } else {
+                let release = updater
+                    .update()
+                    .map_err(|e| CliError::Update(e.to_string()))?;
+                let v = release.version().trim_start_matches('v').to_string();
+                let up_to_date = v == current;
+                let status = if up_to_date { "up_to_date" } else { "updated" };
+                let result = serde_json::json!({
+                    "current_version": current,
+                    "latest_version": v,
+                    "status": status,
+                });
+                match fmt {
+                    OutputFormat::Json => output::json::success(&result),
+                    OutputFormat::Table => {
+                        if up_to_date {
+                            eprintln!("Already up to date (v{current})");
+                        } else {
+                            eprintln!("Updated: v{current} -> v{v}");
+                            eprintln!(
+                                "Run `suno install-skill --force` to refresh the agent skill"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
         Commands::AgentInfo => {
             let auth_path = directories::ProjectDirs::from("com", "suno-cli", "suno-cli")
                 .map(|d| d.config_dir().join("auth.json").display().to_string())
@@ -665,7 +684,7 @@ async fn run() -> Result<(), CliError> {
                     "list", "search", "status", "download", "delete",
                     "set", "publish", "timed-lyrics",
                     "credits", "models", "auth", "config", "agent-info",
-                    "install-skill"
+                    "install-skill", "update"
                 ],
                 "models": {
                     "v5.5": "chirp-fenix",

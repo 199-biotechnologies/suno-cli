@@ -26,6 +26,9 @@ pub enum CliError {
     #[error("Not found: {0}")]
     NotFound(String),
 
+    #[error("Self-update failed: {0}")]
+    Update(String),
+
     #[error(transparent)]
     Http(#[from] reqwest::Error),
 
@@ -47,6 +50,7 @@ impl CliError {
             | Self::Http(_)
             | Self::GenerationFailed(_)
             | Self::Download(_)
+            | Self::Update(_)
             | Self::Io(_)
             | Self::Json(_) => 1,
         }
@@ -65,6 +69,7 @@ impl CliError {
             Self::Http(_) => "http_error",
             Self::Io(_) => "io_error",
             Self::Json(_) => "json_error",
+            Self::Update(_) => "update_error",
         }
     }
 
@@ -79,9 +84,13 @@ impl CliError {
                 "Check that the clip has finished generating with `suno status <id>`"
             }
             Self::GenerationFailed(_) => "Check `suno credits` for remaining balance",
+            Self::Api { code, .. } if *code == "schema_drift" => {
+                "Suno changed their API. Run `suno update` for the latest fix, or check https://github.com/199-biotechnologies/suno-cli/issues"
+            }
             Self::Api { .. } | Self::Http(_) => "Check your network connection and retry",
             Self::Io(_) => "Check file permissions and disk space",
-            Self::Json(_) => "This may indicate an API change — update suno",
+            Self::Json(_) => "This may indicate an API change — run `suno update` for the latest fix",
+            Self::Update(_) => "Check your network connection or download the binary directly from GitHub Releases",
         }
     }
 }

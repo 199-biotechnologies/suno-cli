@@ -4,30 +4,20 @@ use crate::errors::CliError;
 
 impl SunoClient {
     /// Create a cover of an existing clip.
-    /// Routes through /api/generate/v2/ with task="cover" + cover_clip_id.
+    /// Posts to `/api/generate/v2-web/` with `cover_clip_id` set. The legacy
+    /// `task: "cover"` field is gone in v2-web; we still don't have a fresh
+    /// web-app capture for the cover flow, so this is a best-guess port — if
+    /// the API rejects, we'll need to capture a real cover request and add
+    /// any missing required fields (e.g. cover_start_s/cover_end_s).
     pub async fn cover(
         &self,
         clip_id: &str,
         model_key: &str,
         tags: Option<&str>,
     ) -> Result<Vec<Clip>, CliError> {
-        let req = GenerateRequest {
-            mv: model_key.to_string(),
-            prompt: None,
-            gpt_description_prompt: None,
-            title: None,
-            tags: tags.map(String::from),
-            negative_tags: None,
-            make_instrumental: false,
-            generation_type: None,
-            token: None,
-            continue_clip_id: None,
-            continue_at: None,
-            task: Some("cover".into()),
-            persona_id: None,
-            cover_clip_id: Some(clip_id.to_string()),
-            metadata: None,
-        };
+        let mut req = GenerateRequest::new(model_key, "cover");
+        req.tags = tags.map(String::from);
+        req.cover_clip_id = Some(clip_id.to_string());
         self.generate(&req).await
     }
 }

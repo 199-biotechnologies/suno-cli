@@ -60,6 +60,9 @@ pub struct RemasterModelInfo {
     pub name: String,
     pub external_key: String,
     pub is_default_model: bool,
+    /// Suno's billing/info response for remaster models does NOT include this
+    /// field — keep it optional so deserialization succeeds.
+    #[serde(default)]
     pub can_use: bool,
 }
 
@@ -142,46 +145,111 @@ pub struct FilterPresence {
 }
 
 // --- Generation ---
+//
+// Schema captured from a real Suno web-app POST to `/api/generate/v2-web/`
+// on 2026-04-07 (see API_INTELLIGENCE.md). The old `/api/generate/v2/` path
+// returns `Token validation failed` since Suno started routing creates
+// through `v2-web` exclusively. Most of the new `null` fields are pure
+// placeholders the web app sends regardless of mode — they MUST be present
+// or pydantic returns `missing field`.
 
 #[derive(Debug, Serialize)]
 pub struct GenerateRequest {
-    pub mv: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub prompt: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub gpt_description_prompt: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub title: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub tags: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub negative_tags: Option<String>,
-    pub make_instrumental: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub generation_type: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Captcha/anti-bot token. Always serialized as `null` from the CLI; the
+    /// real validation happens via `metadata.create_session_token`.
     pub token: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub continue_clip_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub continue_at: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub task: Option<String>,
-    /// Voice persona ID — used with task="vox"
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub persona_id: Option<String>,
-    /// Source clip for covers/remasters — used with task="cover"
-    #[serde(skip_serializing_if = "Option::is_none")]
+    pub generation_type: String,
+    pub title: Option<String>,
+    pub tags: Option<String>,
+    /// Always present, defaults to "" (empty string, NOT null).
+    pub negative_tags: String,
+    pub mv: String,
+    pub prompt: String,
+    pub make_instrumental: bool,
+    pub user_uploaded_images_b64: Option<String>,
+    pub metadata: GenerateMetadata,
+    /// Always present, empty array unless overriding model fields.
+    pub override_fields: Vec<serde_json::Value>,
     pub cover_clip_id: Option<String>,
-    /// Control sliders — nested correctly under metadata per xiliourt/Suno-Architect
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<GenerateMetadata>,
+    pub cover_start_s: Option<f64>,
+    pub cover_end_s: Option<f64>,
+    pub persona_id: Option<String>,
+    pub artist_clip_id: Option<String>,
+    pub artist_start_s: Option<f64>,
+    pub artist_end_s: Option<f64>,
+    pub continue_clip_id: Option<String>,
+    pub continued_aligned_prompt: Option<String>,
+    pub continue_at: Option<f64>,
+    /// Random UUID generated per request — required.
+    pub transaction_uuid: String,
 }
 
+impl GenerateRequest {
+    /// Build a `GenerateRequest` with all the new-schema placeholder fields
+    /// pre-populated (nulls, empty arrays, fresh UUIDs). Callers only need to
+    /// override the fields that matter for their command.
+    pub fn new(mv: &str, create_mode: &str) -> Self {
+        Self {
+            token: None,
+            generation_type: "TEXT".to_string(),
+            title: None,
+            tags: None,
+            negative_tags: String::new(),
+            mv: mv.to_string(),
+            prompt: String::new(),
+            make_instrumental: false,
+            user_uploaded_images_b64: None,
+            metadata: GenerateMetadata::new(create_mode),
+            override_fields: Vec::new(),
+            cover_clip_id: None,
+            cover_start_s: None,
+            cover_end_s: None,
+            persona_id: None,
+            artist_clip_id: None,
+            artist_start_s: None,
+            artist_end_s: None,
+            continue_clip_id: None,
+            continued_aligned_prompt: None,
+            continue_at: None,
+            transaction_uuid: uuid::Uuid::new_v4().to_string(),
+        }
+    }
+}
+
+/// Web-app metadata block. All fields are required by the new schema even if
+/// they're decorative. `user_tier` is NOT validated server-side (verified with
+/// empty string and arbitrary text — both succeed).
 #[derive(Debug, Serialize)]
 pub struct GenerateMetadata {
+    pub web_client_pathname: String,
+    pub is_max_mode: bool,
+    pub is_mumble: bool,
+    pub create_mode: String,
+    pub user_tier: String,
+    /// Random UUID generated per request — looks decorative but must be present.
+    pub create_session_token: String,
+    pub disable_volume_normalization: bool,
+    /// Control sliders (weirdness / style influence). Optional — only sent
+    /// when --weirdness or --style-influence is passed.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub control_sliders: Option<ControlSliders>,
+}
+
+impl GenerateMetadata {
+    /// Build a metadata block with default web-app values + a fresh session
+    /// token. This matches what the real Suno UI sends per generation.
+    pub fn new(create_mode: &str) -> Self {
+        Self {
+            web_client_pathname: "/create".to_string(),
+            is_max_mode: false,
+            is_mumble: false,
+            create_mode: create_mode.to_string(),
+            user_tier: String::new(),
+            create_session_token: uuid::Uuid::new_v4().to_string(),
+            disable_volume_normalization: false,
+            control_sliders: None,
+        }
+    }
 }
 
 #[derive(Debug, Serialize)]

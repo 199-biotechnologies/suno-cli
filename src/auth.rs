@@ -94,8 +94,14 @@ impl AuthState {
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
             .as_secs();
-        // Expired or within 30 seconds of expiry
-        now + 30 >= exp
+        // Refresh aggressively: any JWT with under 30 minutes of life left.
+        //
+        // Suno issues 1-hour JWTs but their generation endpoint silently
+        // rejects tokens older than ~30 minutes with `Token validation
+        // failed.` even when the JWT's own `exp` claim says it's still
+        // valid (verified 2026-04-07). The 30-minute threshold ensures we
+        // always hand the API a freshly-minted JWT.
+        now + 1800 >= exp
     }
 
     fn path() -> PathBuf {

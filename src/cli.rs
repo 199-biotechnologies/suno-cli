@@ -92,6 +92,16 @@ pub enum Commands {
 
     /// Install the agent skill (teaches Claude Code / coding agents how to use this CLI)
     InstallSkill(InstallSkillArgs),
+
+    /// Self-update from GitHub Releases
+    Update(UpdateArgs),
+}
+
+#[derive(clap::Args)]
+pub struct UpdateArgs {
+    /// Check for a new version without installing
+    #[arg(long)]
+    pub check: bool,
 }
 
 #[derive(clap::Args)]

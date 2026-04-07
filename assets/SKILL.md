@@ -185,5 +185,6 @@ suno download $ids --output ./archive/
 
 - Auth refreshes automatically (~7-day session lifetime).
 - Captcha is **not** required for Premier accounts with 200+ credits consumed.
-- All generation paths (normal, voice persona, cover, extend) go through `/api/generate/v2/` with different `task` values — but you don't need to know that, just use the subcommands.
+- All generation paths (normal, voice persona, cover, extend) go through `/api/generate/v2-web/` — but you don't need to know that, just use the subcommands.
+- When the CLI returns `schema_drift` (Suno changed their API), run `suno update` to pull the latest binary from GitHub Releases.
 - When unsure about flags, run `suno <command> --help` or `suno agent-info`.

@@ -53,6 +53,17 @@ cargo install suno
 
 Download from [GitHub Releases](https://github.com/199-biotechnologies/suno-cli/releases) — binaries for macOS (Apple Silicon + Intel), Linux (x86_64 + ARM), and Windows.
 
+### Self-update
+
+Already have `suno` installed? Pull the latest binary from GitHub Releases without touching your package manager:
+
+```bash
+suno update --check    # see what's available
+suno update            # install the latest release
+```
+
+> Tip: when Suno changes their API mid-cycle, run `suno update` first — it's faster than `cargo install suno` or waiting for the Homebrew bottle to refresh.
+
 ## Quick Start
 
 ```bash
@@ -128,6 +139,7 @@ suno auth            Set up authentication
 suno config          show | set | check
 suno agent-info      Machine-readable capabilities JSON
 suno install-skill   Install agent skill into Claude Code / Cursor
+suno update          Self-update from GitHub Releases (--check to peek first)
 ```
 
 ## Features
@@ -191,7 +203,7 @@ suno cover <clip_id> --tags "jazz, smooth piano" --model v5.5 --wait
 suno remaster <clip_id> --model v5.5 --wait --download ./remastered/
 ```
 
-Both route through Suno's unified generation endpoint (`/api/generate/v2/`).
+Both route through Suno's unified web generation endpoint (`/api/generate/v2-web/`).
 
 ### Clip Info
 

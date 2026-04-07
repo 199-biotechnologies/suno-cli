@@ -111,6 +111,26 @@ impl SunoClient {
         }
         if !status.is_success() {
             let body = resp.text().await.unwrap_or_default();
+            // Map known Suno error patterns to actionable codes so callers
+            // get a meaningful suggestion instead of an opaque HTTP dump.
+            //
+            // `Token validation failed` is what Suno returns when the JWT
+            // has crossed their server-side staleness threshold (~30 min)
+            // even when the JWT's own `exp` claim is still valid. We treat
+            // it as `AuthExpired` so the next CLI invocation will refresh
+            // via the Clerk session cookie and pick up a fresh token.
+            if body.contains("Token validation failed") {
+                return Err(CliError::AuthExpired);
+            }
+            if body.contains("'loc': ['body', 'params'") || body.contains("\"loc\": [\"body\", \"params\"")
+            {
+                return Err(CliError::Api {
+                    code: "schema_drift",
+                    message: format!(
+                        "HTTP {status}: Suno's request schema has changed — the CLI needs an update. Body: {body}"
+                    ),
+                });
+            }
             return Err(CliError::Api {
                 code: "api_error",
                 message: format!("HTTP {status}: {body}"),

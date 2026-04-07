@@ -4,8 +4,11 @@ use crate::errors::CliError;
 
 impl SunoClient {
     /// Submit a music generation request (custom mode or inspiration mode).
+    /// Posts to `/api/generate/v2-web/` — the legacy `/api/generate/v2/`
+    /// returns `Token validation failed` since Suno migrated creates to
+    /// `v2-web` server-side (verified 2026-04-07).
     pub async fn generate(&self, req: &GenerateRequest) -> Result<Vec<Clip>, CliError> {
-        let resp = self.post("/api/generate/v2/").json(req).send().await?;
+        let resp = self.post("/api/generate/v2-web/").json(req).send().await?;
         let resp = self.check_response(resp).await?;
         let result: GenerateResponse = resp.json().await?;
         Ok(result.clips)

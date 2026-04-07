@@ -47,20 +47,4 @@ impl SunoClient {
         })?;
         Ok(serde_json::from_value(words.clone())?)
     }
-
-    /// Check whether captcha is required before generation.
-    pub async fn check_captcha(&self) -> Result<bool, CliError> {
-        let resp = self
-            .post("/api/c/check")
-            .json(&serde_json::json!({"ctype": "generation"}))
-            .send()
-            .await?;
-        let resp = self.check_response(resp).await?;
-        // Try to parse; if the response doesn't have captcha_required, assume false
-        let body: serde_json::Value = resp.json().await?;
-        Ok(body
-            .get("captcha_required")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false))
-    }
 }

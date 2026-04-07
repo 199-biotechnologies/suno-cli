@@ -1,6 +1,6 @@
 [package]
 name = "suno"
-version = "0.5.1"
+version = "0.5.2"
 edition = "2024"
 description = "Generate AI music from your terminal — Suno v5.5 with tags, exclude, vocal control, and all generation features"
 license = "MIT"
@@ -30,6 +30,7 @@ futures-util = "0.3"
 id3 = "1"
 rookie = "0.5"
 uuid = { version = "1", features = ["v4"] }
+self_update = { version = "0.42", default-features = false, features = ["rustls", "compression-flate2", "archive-tar"] }
 
 [dev-dependencies]
 assert_cmd = "2"
