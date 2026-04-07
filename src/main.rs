@@ -371,8 +371,15 @@ async fn run() -> Result<(), CliError> {
             let clips = c
                 .cover(&args.clip_id, args.model.to_api_key(), args.tags.as_deref())
                 .await?;
-            handle_generation(&c, clips, args.wait, args.download.as_deref(), &fmt, cli.quiet)
-                .await?;
+            handle_generation(
+                &c,
+                clips,
+                args.wait,
+                args.download.as_deref(),
+                &fmt,
+                cli.quiet,
+            )
+            .await?;
         }
 
         Commands::Remaster(args) => {
@@ -381,8 +388,15 @@ async fn run() -> Result<(), CliError> {
             }
             let c = client().await?;
             let clips = c.remaster(&args.clip_id, args.model.to_api_key()).await?;
-            handle_generation(&c, clips, args.wait, args.download.as_deref(), &fmt, cli.quiet)
-                .await?;
+            handle_generation(
+                &c,
+                clips,
+                args.wait,
+                args.download.as_deref(),
+                &fmt,
+                cli.quiet,
+            )
+            .await?;
         }
 
         Commands::Stems(args) => {

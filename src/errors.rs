@@ -75,7 +75,9 @@ impl CliError {
             Self::RateLimited => "Wait 30-60 seconds and retry",
             Self::Config(_) => "Check `suno config check` for configuration issues",
             Self::NotFound(_) => "Verify the ID exists with `suno list` or `suno search`",
-            Self::Download(_) => "Check that the clip has finished generating with `suno status <id>`",
+            Self::Download(_) => {
+                "Check that the clip has finished generating with `suno status <id>`"
+            }
             Self::GenerationFailed(_) => "Check `suno credits` for remaining balance",
             Self::Api { .. } | Self::Http(_) => "Check your network connection and retry",
             Self::Io(_) => "Check file permissions and disk space",

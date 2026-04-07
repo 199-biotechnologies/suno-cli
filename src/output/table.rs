@@ -113,10 +113,7 @@ pub fn clip_detail(clip: &Clip) {
             .map(|d| format!("{:.1}s", d))
             .unwrap_or_else(|| "-".into()),
     ]);
-    table.add_row(vec![
-        "Tags",
-        clip.metadata.tags.as_deref().unwrap_or("-"),
-    ]);
+    table.add_row(vec!["Tags", clip.metadata.tags.as_deref().unwrap_or("-")]);
     table.add_row(vec![
         "BPM",
         &clip
@@ -128,7 +125,10 @@ pub fn clip_detail(clip: &Clip) {
     table.add_row(vec!["Plays", &clip.play_count.to_string()]);
     table.add_row(vec!["Upvotes", &clip.upvote_count.to_string()]);
     table.add_row(vec!["Has Stems", &clip.metadata.has_stem.to_string()]);
-    table.add_row(vec!["Instrumental", &clip.metadata.make_instrumental.to_string()]);
+    table.add_row(vec![
+        "Instrumental",
+        &clip.metadata.make_instrumental.to_string(),
+    ]);
 
     if let Some(ref url) = clip.audio_url {
         table.add_row(vec!["Audio URL", url]);
