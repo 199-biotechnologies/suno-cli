@@ -1,5 +1,5 @@
 use super::SunoClient;
-use super::types::PersonaInfo;
+use super::types::{PersonaInfo, PersonaResponse};
 use crate::errors::CliError;
 
 impl SunoClient {
@@ -13,19 +13,7 @@ impl SunoClient {
             .send()
             .await?;
         let resp = self.check_response(resp).await?;
-
-        let body: serde_json::Value = resp.json().await?;
-
-        if let Some(first) = body
-            .get("items")
-            .and_then(|v| v.as_array())
-            .and_then(|items| items.first())
-        {
-            let info: PersonaInfo = serde_json::from_value(first.clone())?;
-            return Ok(info);
-        }
-
-        let info: PersonaInfo = serde_json::from_value(body)?;
-        Ok(info)
+        let body: PersonaResponse = resp.json().await?;
+        Ok(body.persona)
     }
 }

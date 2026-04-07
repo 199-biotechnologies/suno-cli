@@ -39,7 +39,13 @@ impl SunoClient {
             .send()
             .await?;
         let resp = self.check_response(resp).await?;
-        Ok(resp.json().await?)
+        let body: serde_json::Value = resp.json().await?;
+        // API returns {"aligned_words": [...], ...} — extract the array
+        let words = body.get("aligned_words").ok_or_else(|| CliError::Api {
+            code: "missing_field",
+            message: "aligned_lyrics response missing 'aligned_words' field".into(),
+        })?;
+        Ok(serde_json::from_value(words.clone())?)
     }
 
     /// Check whether captcha is required before generation.

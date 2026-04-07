@@ -276,11 +276,9 @@ pub struct ConcatRequest {
 
 // --- Persona ---
 
-#[allow(dead_code)]
 #[derive(Debug, Deserialize, Serialize)]
 pub struct PersonaResponse {
-    #[serde(default)]
-    pub items: Vec<PersonaInfo>,
+    pub persona: PersonaInfo,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -290,9 +288,11 @@ pub struct PersonaInfo {
     #[serde(default)]
     pub description: Option<String>,
     #[serde(default)]
-    pub image_url: Option<String>,
+    pub image_s3_id: Option<String>,
     #[serde(default)]
-    pub created_at: Option<String>,
+    pub user_display_name: Option<String>,
     #[serde(default)]
-    pub num_clips: u64,
+    pub user_handle: Option<String>,
+    #[serde(default)]
+    pub persona_clips: Vec<serde_json::Value>,
 }

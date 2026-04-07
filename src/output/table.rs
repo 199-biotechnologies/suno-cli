@@ -161,10 +161,13 @@ pub fn persona(info: &PersonaInfo) {
         "Description",
         info.description.as_deref().unwrap_or("-"),
     ]);
-    table.add_row(vec!["Clips", &info.num_clips.to_string()]);
-    if let Some(ref created) = info.created_at {
-        table.add_row(vec!["Created", created]);
+    if let Some(ref owner) = info.user_display_name {
+        table.add_row(vec!["Owner", owner]);
     }
+    if let Some(ref handle) = info.user_handle {
+        table.add_row(vec!["Handle", handle]);
+    }
+    table.add_row(vec!["Clips", &info.persona_clips.len().to_string()]);
 
     println!("{table}");
 }
