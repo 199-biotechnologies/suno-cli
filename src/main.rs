@@ -123,7 +123,26 @@ async fn run() -> Result<(), CliError> {
                 Err(e) => return Err(e),
             };
 
-            if args.login {
+            if args.refresh {
+                // Force-refresh the JWT via the stored Clerk session cookie.
+                // Useful when the API rejects the current JWT mid-session
+                // before the CLI's own staleness check fires.
+                let cookie = state.clerk_client_cookie.clone().ok_or_else(|| {
+                    CliError::Config(
+                        "no Clerk session cookie stored — run `suno auth --login` first".into(),
+                    )
+                })?;
+                let session_id = state.session_id.clone().ok_or_else(|| {
+                    CliError::Config("no Clerk session id stored — run `suno auth --login`".into())
+                })?;
+                let http = reqwest::Client::new();
+                eprintln!("Refreshing JWT via Clerk session cookie...");
+                let jwt = auth::clerk_refresh_jwt(&http, &cookie, &session_id).await?;
+                state.jwt = Some(jwt);
+                state.save()?;
+                eprintln!("JWT refreshed successfully");
+                return Ok(());
+            } else if args.login {
                 // Automatic: extract cookies from browser
                 eprintln!("Extracting Suno session from your browser...");
                 let clerk_cookie = auth::extract_clerk_cookie()?;

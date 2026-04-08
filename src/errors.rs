@@ -85,7 +85,7 @@ impl CliError {
             }
             Self::GenerationFailed(_) => "Check `suno credits` for remaining balance",
             Self::Api { code, .. } if *code == "schema_drift" => {
-                "Suno changed their API. Run `suno update` for the latest fix, or check https://github.com/199-biotechnologies/suno-cli/issues"
+                "Suno changed their API or rolled out hCaptcha enforcement. Try (1) `suno auth --refresh` to mint a fresh JWT, (2) `suno update` to pull the latest fix, (3) supply an hCaptcha solution via `--token <solved>`, or (4) see https://github.com/199-biotechnologies/suno-cli/issues for the current status"
             }
             Self::Api { .. } | Self::Http(_) => "Check your network connection and retry",
             Self::Io(_) => "Check file permissions and disk space",

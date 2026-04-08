@@ -406,6 +406,12 @@ pub struct AuthArgs {
     #[arg(long)]
     pub login: bool,
 
+    /// Force-refresh the JWT via the stored Clerk session cookie. Use this
+    /// when the CLI returns `auth_expired` or `Token validation failed`
+    /// without requiring a full re-login from the browser.
+    #[arg(long)]
+    pub refresh: bool,
+
     /// JWT token (manual fallback)
     #[arg(long)]
     pub jwt: Option<String>,
